@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "L'endpoint /predict renvoie 500 sur une image PNG transparente",
+    "status": "open",
+    "priority": "high",
+    "description": "Quand on envoie un PNG avec canal alpha, l'API plante au moment de la conversion en tenseur.",
+    "comments": [
+      "Piste de correction : le PNG transparent arrive en mode RGBA (4 canaux), voire en mode \"P\"/\"LA\" (palette ou niveaux de gris + alpha), alors que le modèle attend un tenseur à 3 canaux (RGB). Le plantage vient très probablement d'une incompatibilité de forme lors de la normalisation ou de la conversion en tenseur.\n\nProposition : normaliser l'image juste après le décodage, avant tout prétraitement :\n\n```python\nfrom PIL import Image\n\nimg = Image.open(file)\nif img.mode in (\"RGBA\", \"LA\", \"P\"):\n    img = img.convert(\"RGBA\")\n    background = Image.new(\"RGB\", img.size, (255, 255, 255))\n    background.paste(img, mask=img.split()[3])  # aplatit l'alpha sur fond blanc\n    img = background\nelse:\n    img = img.convert(\"RGB\")\n```\n\n(Un simple `img.convert(\"RGB\")` suffit aussi, mais les zones transparentes deviennent alors noires, ce qui peut fausser la prédiction. Le fond blanc est plus sûr.)\n\nÀ ajouter également :\n- un test unitaire avec un PNG RGBA, un PNG en palette avec transparence et une image en niveaux de gris ;\n- capturer les erreurs de décodage (`PIL.UnidentifiedImageError`) pour renvoyer un 400 plutôt qu'un 500 quand l'image est invalide."
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Ajouter un endpoint /health pour le monitoring",
+    "status": "open",
+    "priority": "medium",
+    "description": "Le load balancer a besoin d'un endpoint simple qui renvoie 200 si le modèle est chargé.",
+    "comments": []
+  },
+  {
+    "id": 3,
+    "title": "Réduire la taille de l'image Docker",
+    "status": "closed",
+    "priority": "low",
+    "description": "L'image fait plus de 2 Go à cause des dépendances CUDA inutiles en inférence CPU.",
+    "comments": [
+      "Passé sur python:3.12-slim + torch CPU, image à 800 Mo."
+    ]
+  }
+]
