@@ -15,7 +15,9 @@
     "status": "open",
     "priority": "medium",
     "description": "Le load balancer a besoin d'un endpoint simple qui renvoie 200 si le modèle est chargé.",
-    "comments": []
+    "comments": [
+      "Piste de proposition / implémentation :\n\nPour répondre au besoin du load balancer (sonde de disponibilité / readiness probe), l'endpoint `/health` doit vérifier que le modèle est bien chargé en mémoire avant de renvoyer un statut 200 OK, et renvoyer un statut 503 (Service Unavailable) si le chargement n'est pas encore terminé ou en cas d'échec.\n\nProposition d'implémentation (ex. FastAPI) :\n\n```python\nfrom fastapi import status\nfrom fastapi.responses import JSONResponse\n\n@app.get(\"/health\", tags=[\"Monitoring\"])\nasync def health_check():\n    # Vérifier l'état de chargement du modèle (ex: via app.state ou un gestionnaire de modèle)\n    if not getattr(app.state, \"model_ready\", False) or app.state.model is None:\n        return JSONResponse(\n            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,\n            content={\"status\": \"unhealthy\", \"detail\": \"Model is not loaded or not ready\"}\n        )\n    return {\"status\": \"healthy\", \"model_ready\": True}\n```\n\nPoints d'attention et bonnes pratiques :\n- **Readiness vs Liveness** : Pour le load balancer, cet endpoint doit agir comme un check de disponibilité (readiness probe) afin qu'aucune requête d'inférence ne soit routée vers une instance qui n'a pas fini son initialisation. Si besoin, dissocier plus tard `/healthz` (liveness simple) et `/ready` (readiness).\n- **Légèreté du check** : Ne faire qu'un contrôle d'état/présence du modèle en mémoire plutôt qu'une fausse inférence (dummy forward pass) afin de ne pas surcharger le CPU/GPU avec les pings réguliers du load balancer.\n- **Tests** : Ajouter des tests vérifiant la réponse 503 quand le modèle n'est pas prêt et 200 lorsqu'il est chargé."
+    ]
   },
   {
     "id": 3,
